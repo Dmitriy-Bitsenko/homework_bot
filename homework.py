@@ -31,6 +31,13 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler(stream=sys.stdout)
+formatter = logging.Formatter('%(asctime)s, %(levelname)s, %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 def check_tokens():
     """Функция проверки доступности переменных окружения."""
@@ -115,49 +122,23 @@ def main():
         logging.critical("Отсутствует токен")
         sys.exit()
 
-    try:
-        bot = TeleBot(token=TELEGRAM_TOKEN)
-    except Exception as error:
-        logging.critical(f"Ошибка при создании экземпляра Bot(): {error}")
-        sys.exit()
-
+    bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    prev_message = ""
 
     while True:
         try:
             response = get_api_answer(timestamp)
-            timestamp = response.get("current_date", timestamp)
-            homework = check_response(response)
-            if homework:
-                message = parse_status(homework[0])
-                prev_message = check_message(bot, message, prev_message)
+            homeworks = check_response(response)
+            if homeworks:
+                for homework in homeworks:
+                    send_message(bot, parse_status(homework))
             else:
-                logging.debug("Нет новых данных")
-
-        except ConnectionError as error:
-            message = f"Ошибка соединения: {error}"
-            logging.exception(message)
-            prev_message = check_message(bot, message, prev_message)
-        except TypeError as error:
-            message = f"Объект несоответствующего типа: {error}"
-            logging.exception(message)
-            prev_message = check_message(bot, message, prev_message)
+                logger.debug('Программа сработала штатно.')
         except Exception as error:
-            message = f"Сбой в работе программы: {error}"
-            logging.exception(message)
-            prev_message = check_message(bot, message, prev_message)
-
+            logger.error(f'Сбой в работе программы: {error}')
         finally:
             time.sleep(RETRY_PERIOD)
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format=(
-            "%(asctime)s - %(levelname)s - %(filename)s.%(funcName)s."
-            "%(lineno)d - %(message)s"
-        ),
-    )
     main()
