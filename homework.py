@@ -1,3 +1,4 @@
+import json
 from http import HTTPStatus
 
 import logging
@@ -31,6 +32,7 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler(stream=sys.stdout)
@@ -39,87 +41,81 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+class HTTPResponseError(Exception):
+    """Исключение при ответе со статусом, отличным от 200."""
+
+
 def check_tokens():
-    """Функция проверки доступности переменных окружения."""
-    return all((PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID))
+    """Доступность переменных окружения."""
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
-def send_message(bot: TeleBot, message: str):
-    """Функция отправляет сообщение в Telegram чат."""
-    logging.debug(f"Отправка боту: {bot} сообщения: {message}")
+def send_message(bot, message):
+    """Отправка сообщения в Telegram чат."""
     try:
-        bot.send_message(
-            chat_id=TELEGRAM_CHAT_ID,
-            text=message,
-        )
-        logging.debug("Успешная отправка сообщения в Telegram")
+        bot.send_message(TELEGRAM_CHAT_ID, message)
+        logger.debug('Сообщение отправлено успешно!')
     except telegram.error.TelegramError as error:
-        logging.error(f"Ошибка при отправке сообщения: {error}")
-        raise telegram.error.TelegramError
+        logger.error(f'Возникла ошибка при отправке сообщения: {error}')
 
 
-def get_api_answer(timestamp: int):
-    """Функция делает запрос к единственному эндпоинту API-сервиса."""
-    payload = {"from_date": timestamp}
-    logging.debug(f"{ENDPOINT}, headers {HEADERS}, params{payload}, timeout=5")
+def get_api_answer(timestamp):
+    """Запрос к эндпоинту API."""
+    payload = {'from_date': timestamp}
     try:
+        logger.debug('Запрос к эндпоинту API...')
         homework_statuses = requests.get(
-            ENDPOINT, headers=HEADERS, params=payload, timeout=5
+            ENDPOINT, headers=HEADERS, params=payload
         )
-    except requests.RequestException as error:
-        raise ConnectionError(f"Ошибка при запросе к API: {error}") from error
-    status_code = homework_statuses.status_code
-    if status_code != HTTPStatus.OK:
-        raise ConnectionError(f"Ответ сервера: {status_code}")
-
-    return homework_statuses.json()
+    except requests.exceptions.RequestException as error:
+        logger.error(f'Сбой при доступе к эндпоинту {ENDPOINT}: {error}')
+    if homework_statuses.status_code != HTTPStatus.OK:
+        raise HTTPResponseError(
+            f'Сбой при доступе к эндпоинту {ENDPOINT}.'
+            f'Статус ответа: {homework_statuses.status_code}.'
+        )
+    try:
+        homework_statuses = homework_statuses.json()
+    except json.JSONDecodeError:
+        logger.error('Сбой при приведениb ответа к типам данных Python')
+    return homework_statuses
 
 
 def check_response(response):
-    """Функция проверяет ответ API на соответствие документации."""
-    logging.debug(f"Начинается проверка ответа API: {response}")
-    if not isinstance(response, dict):
-        raise TypeError("Данные приходят не в виде словаря")
-    if "homeworks" not in response:
-        raise KeyError("Нет ключа 'homeworks'")
-    if "current_date" not in response:
-        raise KeyError("Нет ключа 'current_date'")
-    if not isinstance(response["homeworks"], list):
-        raise TypeError("Данные приходят не в виде списка")
-
-    return response.get("homeworks")
+    """Проверка ответа API."""
+    try:
+        homework_statuses = response['homeworks']
+    except KeyError as error:
+        logger.error(f'Сбой при проверке ключей в ответе API ({error})')
+    if not isinstance(homework_statuses, list):
+        raise TypeError('Ответ API - не в виде списка')
+    return homework_statuses
 
 
 def parse_status(homework):
-    """Функция извлекает статус о конкретной домашней работе."""
-    logging.debug("Начали парсинг статуса")
-    homework_name = homework.get("homework_name")
-    if not homework_name:
-        raise KeyError("Нет ключа 'homework_name'")
-    status = homework.get("status")
-    if not status:
-        raise KeyError("Нет ключа 'status'")
-    verdict = HOMEWORK_VERDICTS.get(status)
-    if not verdict:
-        raise KeyError("API возвращает недокументированный статус")
+    """Извлечение статуса работы."""
+    try:
+        homework_name = homework['homework_name']
+        homework_status = homework['status']
+    except KeyError as error:
+        raise KeyError(f'Сбой при проверке ключей в ответе API ({error})')
+    try:
+        verdict = HOMEWORK_VERDICTS[homework_status]
+    except KeyError as error:
+        raise KeyError(
+            f'Несоотвутствие статуса домашней работы '
+            f'ответа API: {error}'
+        )
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
-
-
-def check_message(bot, message, prev_message) -> str:
-    """Функция отправляет сообщение боту, если оно изменилось.
-    Функция возвращает сообщение, которые уже было отправлено.
-    """
-    if message != prev_message:
-        send_message(bot, message)
-    else:
-        logging.debug("Повтор сообщения, не отправляется боту")
-    return message
 
 
 def main():
     """Основная логика работы бота."""
     if not check_tokens():
-        logging.critical("Отсутствует токен")
+        logger.critical(
+            'Отсутствует обязательная переменная окружения, '
+            'программа принудительно остановлена.'
+        )
         sys.exit()
 
     bot = TeleBot(token=TELEGRAM_TOKEN)
@@ -140,5 +136,5 @@ def main():
             time.sleep(RETRY_PERIOD)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
