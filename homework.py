@@ -1,17 +1,18 @@
 from http import HTTPStatus
 
-import telegram
 import logging
 import sys
 import time
 
 import requests
+import telegram
 from dotenv import load_dotenv
 import os
 
 from telebot import TeleBot
 
 load_dotenv()
+
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
@@ -93,7 +94,7 @@ def parse_status(homework):
         raise KeyError("Нет ключа 'status'")
     verdict = HOMEWORK_VERDICTS.get(status)
     if not verdict:
-        raise KeyError("API домашки возвращает недокументированный статус")
+        raise KeyError("API возвращает недокументированный статус")
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
