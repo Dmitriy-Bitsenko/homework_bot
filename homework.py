@@ -47,12 +47,14 @@ class HTTPResponseError(Exception):
 
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
-    tokens = dict(practicum_token=PRACTICUM_TOKEN, tg_token=TELEGRAM_TOKEN, chat_id=TELEGRAM_CHAT_ID)
+    tokens = dict(practicum_token=PRACTICUM_TOKEN, tg_token=TELEGRAM_TOKEN,
+                  chat_id=TELEGRAM_CHAT_ID)
     for key, value in tokens.items():
         if value is None:
             logger.critical(f'{key} отсутствует переменная окружения')
             return False
     return True
+
 
 def send_message(bot, message):
     """Отправка сообщения в Telegram чат."""
