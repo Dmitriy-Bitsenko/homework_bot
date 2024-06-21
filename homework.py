@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -45,6 +46,7 @@ logging.basicConfig(
 logging.StreamHandler(sys.stdout)
 logger = logging.getLogger(__name__)
 
+
 def check_tokens():
     """Проверяет наличие необходимых переменных окружения."""
     tokens = ("PRACTICUM_TOKEN", "TELEGRAM_TOKEN", "TELEGRAM_CHAT_ID")
@@ -77,7 +79,6 @@ def get_api_answer(timestamp):
         response = requests.get(ENDPOINT, headers=HEADERS,
                                 params=params, timeout=10)
     except requests.RequestException as error:
-        logging.error("Ошибка запроса к эндпоинту: %s.", error)
         raise APIRequestError(
             f"Ошибка запроса к {ENDPOINT} c params={params}."
         ) from error
@@ -90,7 +91,13 @@ def get_api_answer(timestamp):
         raise APIRequestError(f"Эндпоинт - {ENDPOINT} недоступен.")
 
     logging.info("Запрос к %s с параметрами %s успешен!", ENDPOINT, params)
-    return response.json()
+
+    try:
+        response = response.json()
+    except json.JSONDecodeError as error:
+        logging.error('API response is not in format', error)
+
+    return response
 
 
 def check_response(response):
@@ -149,6 +156,9 @@ def main():
         while True:
             try:
                 response = get_api_answer(timestamp)
+                if not response:
+                    logging.error("Ошибка запроса к эндпоинту: %s.")
+
                 homeworks = check_response(response)
                 if homeworks:
                     message = parse_status(homeworks[0])
