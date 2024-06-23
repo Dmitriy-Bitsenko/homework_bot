@@ -66,9 +66,9 @@ def send_message(bot, message):
     logging.info("Начало отправки сообщения.")
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-        logging.debug('Бот отправил сообщение "%s".', message)
+        logger.debug('Бот отправил сообщение "%s".', message)
     except Exception as error:
-        logging.error("Ошибка отправки сообщения: %s.", error)
+        logger.error("Ошибка отправки сообщения: %s.", error)
 
 
 def get_api_answer(timestamp):
@@ -84,18 +84,13 @@ def get_api_answer(timestamp):
         ) from error
 
     if response.status_code != HTTPStatus.OK:
-        logging.error(
-            "Эндпоинт %s недоступен, статус код: %s",
-            ENDPOINT, response.status_code
-        )
         raise APIRequestError(f"Эндпоинт - {ENDPOINT} недоступен.")
-
     logging.info("Запрос к %s с параметрами %s успешен!", ENDPOINT, params)
 
     try:
         response = response.json()
     except json.JSONDecodeError as error:
-        logging.error('API response is not in format', error)
+        raise APIRequestError('API response is not in format', error)
 
     return response
 
@@ -158,6 +153,14 @@ def main():
                 response = get_api_answer(timestamp)
                 if not response:
                     logging.error("Ошибка запроса к эндпоинту: %s.")
+
+                if HTTPStatus.OK:
+                    pass
+                else:
+                    logging.error(
+                        "Эндпоинт %s недоступен, статус код: %s",
+                        ENDPOINT, response.status_code
+                    )
 
                 homeworks = check_response(response)
                 if homeworks:
