@@ -63,7 +63,7 @@ def check_tokens():
 
 def send_message(bot, message):
     """Отправляет сообщение в Telegram чат."""
-    logging.info("Начало отправки сообщения.")
+    logger.info("Начало отправки сообщения.")
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logger.debug('Бот отправил сообщение "%s".', message)
@@ -113,7 +113,11 @@ def check_response(response):
         raise TypeError("Значение ключа homeworks не является списком.")
     if not homeworks:
         logging.info("Список домашних работ пуст.")
+        raise (UnknownHomeworkStatusError
+               ('Информация о домашней работе отсутствует'))
+
     return homeworks
+
 
 
 def parse_status(homework):
@@ -165,9 +169,19 @@ def main():
                 homeworks = check_response(response)
                 if homeworks:
                     message = parse_status(homeworks[0])
+                    # if "homework_name" not in homeworks or "status" not in homeworks:
+                    #         logging.error(
+                    #             "Отсутствуют ключи homework_name или status в ответе API")
+                    # homework_status = parse_status(["status"])
+                    # if homework_status not in HOMEWORK_VERDICTS:
+                    #         logging.error("Неизвестный статус домашней работы: %s",
+                    #                       homework_status)
                     send_message(bot, message)
                 else:
                     logging.debug("Отсутствие новых статусов в ответе API.")
+
+
+
                 timestamp = response.get("current_date", timestamp)
             except Exception as error:
                 message = f"Сбой в работе программы: {error}."
@@ -183,3 +197,24 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+# def parse_status(homework):
+#     """Извлекает статус конкретной домашней работы."""
+#     if "homework_name" not in homework or "status" not in homework:
+#         logging.error(
+#             "Отсутствуют ключи homework_name или status в ответе API")
+#         raise InvalidAPIResponseError(
+#             "Отсутствуют ключи homework_name или status в ответе API"
+#         )
+#     homework_name = homework["homework_name"]
+#     homework_status = homework["status"]
+#     if homework_status not in HOMEWORK_VERDICTS:
+#         logging.error("Неизвестный статус домашней работы: %s",
+#                       homework_status)
+#         raise UnknownHomeworkStatusError(
+#             f"Неизвестный статус домашней работы: {homework_status}"
+#         )
+#     verdict = HOMEWORK_VERDICTS[homework_status]
+#     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
