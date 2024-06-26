@@ -113,8 +113,6 @@ def check_response(response):
         raise TypeError("Значение ключа homeworks не является списком.")
     if not homeworks:
         logger.info("Список домашних работ пуст.")
-        raise (UnknownHomeworkStatusError
-               ('Информация о домашней работе отсутствует'))
 
     return homeworks
 
@@ -152,26 +150,10 @@ def main():
             if not response:
                 logger.error("Ошибка запроса к эндпоинту: %s.")
 
-            if HTTPStatus.OK:
-                pass
-            else:
-                logger.error("Эндпоинт %s недоступен, статус код: %s",
-                             ENDPOINT, response.status_code)
-
             homeworks = check_response(response)
             if homeworks:
                 message = parse_status(homeworks[0])
                 send_message(bot, message)
-            if ("homework_name" not in homeworks
-                    or "status" not in homeworks):
-                logger.error("Отсутствуют ключи homework_name или"
-                             "status в ответе API")
-            homework_status = parse_status(["status"])
-            if homework_status not in HOMEWORK_VERDICTS:
-                logger.error("Неизвестный статус домашней работы: %s",
-                             homework_status)
-            else:
-                logger.debug("Отсутствие новых статусов в ответе API.")
 
             timestamp = response.get("current_date", timestamp)
         except Exception as error:
